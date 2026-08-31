@@ -18,7 +18,9 @@ The goal of this project is to answer questions such as:
 
 🚧 **Early development**
 
-The repository currently contains the initial project structure. Backend development will begin with the database model and REST API.
+Milestone 1 (core backend + DB + Jobs API) is complete: the Spring Boot backend connects to PostgreSQL via Flyway migrations, the `Job`/`Technology` many-to-many relationship is modeled and seeded, and `GET /api/jobs` (with `location`, `technology`, `experienceLevel`, `employmentType` filters) and `GET /api/jobs/{id}` are working, returning DTOs rather than raw entities.
+
+Milestone 2 (JSON ingestion + normalization + dictionary extraction) is also complete: `data/jobs.json` holds free-text job postings, which are normalized (locations, employment type, experience level) and scanned by a dictionary-based technology extractor before being persisted, via `POST /api/admin/import/jobs`. Imports are idempotent on `sourceUrl` (repeats are skipped). Work is starting on Milestone 3: the analytics API.
 
 ## Architecture
 

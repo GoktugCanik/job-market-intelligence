@@ -15,8 +15,9 @@ public class JobService {
     }
 
     @Transactional(readOnly = true)
-    public List<JobResponse> getAllJobs() {
-        return jobRepository.findAllWithTechnologies().stream()
+    public List<JobResponse> getAllJobs(String location, String technology, String experienceLevel, String employmentType) {
+        String locationPattern = (location == null) ? null : "%" + location + "%";
+        return jobRepository.findByFilters(locationPattern, technology, experienceLevel, employmentType).stream()
             .map(JobResponse::from)
             .collect(Collectors.toList());
     }
@@ -26,5 +27,5 @@ public class JobService {
         return jobRepository.findByIdWithTechnologies(id)
             .map(JobResponse::from)
             .orElseThrow(() -> new RuntimeException("Job not found" + id));
-    }
+    }   
 }

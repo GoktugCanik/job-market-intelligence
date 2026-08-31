@@ -20,6 +20,8 @@ This roadmap is designed around a “backend + data model + analytics first, das
 
 ## Milestone 1 — Core backend + DB + Jobs API (MVP core)
 
+**Status:** Complete
+
 **Goal:** PostgreSQL is connected, the model is correct, and jobs can be served via API.
 
 **Work items**
@@ -41,13 +43,16 @@ This roadmap is designed around a “backend + data model + analytics first, das
   - related technologies
 
 **Acceptance criteria**
-- The application starts and connects to PostgreSQL.
-- `GET /api/jobs` and `GET /api/jobs/{id}` work.
-- Job technologies are stored as relationships in DB (not as a single comma-separated string column).
+- [x] The application starts and connects to PostgreSQL.
+- [x] `GET /api/jobs` and `GET /api/jobs/{id}` work, with optional `location`, `technology`, `experienceLevel`, `employmentType` filters.
+- [x] Job technologies are stored as relationships in DB (not as a single comma-separated string column).
+- [ ] DB seed is only 5 jobs so far, below the 20–50 target — can be expanded later or superseded by Milestone 2's JSON ingestion.
 
 ---
 
 ## Milestone 2 — JSON ingestion + normalization + dictionary extraction
+
+**Status:** Complete
 
 **Goal:** Build a stable “data → DB” ingestion pipeline without depending on scraping.
 
@@ -63,8 +68,13 @@ This roadmap is designed around a “backend + data model + analytics first, das
   - Decide whether repeated `sourceUrl` means “update” or “skip” and document it
 
 **Acceptance criteria**
-- `jobs.json` can be imported and persisted into DB.
-- Technology extraction is persisted with correct relationships.
+- [x] `jobs.json` can be imported and persisted into DB.
+- [x] Technology extraction is persisted with correct relationships.
+
+**Implementation notes**
+- `data/jobs.json` holds free-text `description` fields only (no explicit technologies array); technologies are recovered purely by dictionary extraction, matching how a real scraped source would look.
+- Idempotency decision: a repeated `sourceUrl` means **skip** (the existing row is left untouched), not update.
+- Triggered manually via `POST /api/admin/import/jobs`, which returns an `ImportSummary` (`totalRecords`, `imported`, `skippedExisting`, `technologiesCreated`).
 
 ---
 
