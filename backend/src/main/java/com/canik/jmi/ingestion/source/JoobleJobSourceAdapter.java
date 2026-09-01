@@ -19,13 +19,23 @@ import java.time.format.DateTimeParseException;
 import java.util.List;
 
 /**
- * Fetches job postings from Jooble's REST API, filtered to Turkey via the
- * `location` search parameter (e.g. "Istanbul", "Turkey", "Ankara").
+ * Fetches job postings from Jooble's REST API. This is a global/English-
+ * market source, not a Turkey-specific one - see below.
  *
  * The key was issued through Jooble's Turkey signup page (tr.jooble.org),
  * but that subdomain's own /api/{key} endpoint returns an app-level 403
  * ("only registered users") even with a real browser User-Agent - the key
  * only works against the general gateway, https://jooble.org/api/{key}.
+ *
+ * TURKEY COVERAGE (confirmed by direct API testing, not fixable in code):
+ * the general gateway has no Turkey inventory under this key. `location`
+ * values of "Istanbul", "Ankara", "Izmir", "TR" and "Turkiye" all return
+ * totalCount=0, and "Turkey" itself only matches the US town of Turkey, NC
+ * - not the country. So this adapter is deliberately run with no `location`
+ * filter (see ImportController's default) and treated as a general/global
+ * real-world source rather than a Turkey one; `data/jobs.json` remains the
+ * Turkey-focused seed data. Revisit only if a working tr.jooble.org key
+ * becomes available.
  *
  * Jooble's free key has a lifetime cap of 500 requests total (not monthly),
  * so this adapter is only ever called on demand via the admin import
@@ -71,9 +81,15 @@ public class JoobleJobSourceAdapter implements JobSourceAdapter {
         }
 
         JoobleSearchResponse response = search(criteria);
-        log.info("Jooble search for keywords='{}' location='{}' page={} returned {} of {} total results",
-            criteria.keywords(), criteria.location(), criteria.page(),
-            response.jobs() == null ? 0 : response.jobs().size(), response.totalCount());
+        int returned = response.jobs() == null ? 0 : response.jobs().size();
+        if (returned == 0) {
+            log.warn("Jooble search for keywords='{}' location='{}' page={} returned zero results - "
+                + "this key has no confirmed Turkey inventory, see JoobleJobSourceAdapter's class Javadoc",
+                criteria.keywords(), criteria.location(), criteria.page());
+        } else {
+            log.info("Jooble search for keywords='{}' location='{}' page={} returned {} of {} total results",
+                criteria.keywords(), criteria.location(), criteria.page(), returned, response.totalCount());
+        }
 
         return (response.jobs() == null ? List.<JoobleJob>of() : response.jobs()).stream()
             .filter(this::hasRequiredFields)

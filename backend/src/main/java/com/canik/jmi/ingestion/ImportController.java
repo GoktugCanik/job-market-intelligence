@@ -27,7 +27,7 @@ public class ImportController {
     @PostMapping("/jooble")
     public ImportSummary importFromJooble(
             @RequestParam(defaultValue = "developer") String keywords,
-            @RequestParam(defaultValue = "Turkey") String location,
+            @RequestParam(defaultValue = "") String location,
             @RequestParam(defaultValue = "1") int page) {
         return jobIngestionService.importFromSource(
             joobleJobSourceAdapter, new JobFetchCriteria(keywords, location, page));

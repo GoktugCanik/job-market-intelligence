@@ -20,7 +20,29 @@ The goal of this project is to answer questions such as:
 
 Milestone 1 (core backend + DB + Jobs API) is complete: the Spring Boot backend connects to PostgreSQL via Flyway migrations, the `Job`/`Technology` many-to-many relationship is modeled and seeded, and `GET /api/jobs` (with `location`, `technology`, `experienceLevel`, `employmentType` filters) and `GET /api/jobs/{id}` are working, returning DTOs rather than raw entities.
 
-Milestone 2 (JSON ingestion + normalization + dictionary extraction) is also complete: `data/jobs.json` holds free-text job postings, which are normalized (locations, employment type, experience level) and scanned by a dictionary-based technology extractor before being persisted, via `POST /api/admin/import/jobs`. Imports are idempotent on `sourceUrl` (repeats are skipped). Work is starting on Milestone 3: the analytics API.
+Milestone 2 (JSON ingestion + normalization + dictionary extraction) is also complete: `data/jobs.json` holds free-text job postings, which are normalized (locations, employment type, experience level) and scanned by a dictionary-based technology extractor before being persisted, via `POST /api/admin/import/jobs`. Imports are idempotent on `sourceUrl` (repeats are skipped).
+
+Milestone 3 (analytics API) and Milestone 4 (React dashboard) are also complete: all six analytics endpoints are implemented and the dashboard renders each one as a live chart, with no hard-coded data.
+
+Milestone 5 (real-world ingestion) is also complete: a `JobSourceAdapter` interface keeps ingestion source-agnostic, and a `JoobleJobSourceAdapter` (`POST /api/admin/import/jooble`) pulls in genuine, live job postings. Scraping LinkedIn or Kariyer.net directly was never an option (both forbid it in their ToS and block it technically); the Jooble key issued for Turkey also turned out to have no working Turkey inventory on either of its gateways (see `ROADMAP.md` Milestone 5 for the full diagnosis). Since this is a portfolio project, the resolution is to run Jooble as a general/English-market real-world source instead — `data/jobs.json` remains the Turkey-focused seed data, and Jooble demonstrates real, live external ingestion.
+
+The whole stack (Postgres, backend, frontend) is also Dockerized — see **Running with Docker** below.
+
+## Running with Docker
+
+The whole stack — Postgres, the Spring Boot backend, and the React frontend — runs with Docker Compose. No local Java, Maven, Node, or Postgres install needed.
+
+```bash
+cp .env.example .env   # fill in JOOBLE_API_KEY if you have one; safe to leave blank
+docker compose up --build
+```
+
+- Frontend dashboard: http://localhost:5173
+- Backend API: http://localhost:8080
+- Postgres is seeded automatically on first boot via the Flyway migrations in `backend/src/main/resources/db/migration` (no manual DB setup).
+- `data/jobs.json` is mounted read-only into the backend container; trigger an import with `curl -X POST http://localhost:8080/api/admin/import/jobs`.
+- `.env` is gitignored — `POSTGRES_PASSWORD` and `JOOBLE_API_KEY` never get committed or baked into the images (they're passed in as environment variables at container start, not read from any properties file inside the image).
+- If you already have something else bound to ports 8080 or 5173 (e.g. a local `mvn`/`npm run dev` instance), stop it first or Compose will fail to bind.
 
 ## Architecture
 
@@ -127,16 +149,21 @@ PostgreSQL
 
 ### REST API
 
-Planned endpoints include:
+Implemented endpoints:
 
 ```text
-GET /api/jobs
-GET /api/jobs/{id}
+GET  /api/jobs
+GET  /api/jobs/{id}
 
-GET /api/analytics/technologies
-GET /api/analytics/jobs-by-location
-GET /api/analytics/jobs-by-experience-level
-GET /api/analytics/jobs-over-time
+GET  /api/analytics/technologies
+GET  /api/analytics/jobs-by-location
+GET  /api/analytics/jobs-by-experience-level
+GET  /api/analytics/jobs-by-employment-type
+GET  /api/analytics/jobs-over-time
+GET  /api/analytics/technology-combinations
+
+POST /api/admin/import/jobs
+POST /api/admin/import/jooble
 ```
 
 ### Dashboard

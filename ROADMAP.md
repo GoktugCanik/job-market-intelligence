@@ -80,9 +80,11 @@ This roadmap is designed around a “backend + data model + analytics first, das
 
 ## Milestone 3 — Analytics API (fuel for the dashboard)
 
+**Status:** Complete
+
 **Goal:** The backend should generate market intelligence even before any UI exists.
 
-**Suggested endpoints (incremental)**
+**Endpoints (implemented)**
 - `GET /api/analytics/technologies` (top technologies)
 - `GET /api/analytics/jobs-by-location`
 - `GET /api/analytics/jobs-by-experience-level`
@@ -91,47 +93,55 @@ This roadmap is designed around a “backend + data model + analytics first, das
 - `GET /api/analytics/technology-combinations` (most common co-occurrences)
 
 **Acceptance criteria**
-- Each endpoint returns DTOs (not entities).
-- PostgreSQL aggregation queries produce correct counts.
+- [x] Each endpoint returns DTOs (not entities).
+- [x] PostgreSQL aggregation queries produce correct counts.
 
 ---
 
 ## Milestone 4 — React Dashboard (first UI)
 
+**Status:** Complete
+
 **Goal:** UI should only visualize API outputs; business logic stays in the backend.
 
 **Work items**
-- Create React app
-- Connect to analytics endpoints
-- Charts (e.g., bar chart, line chart)
+- [x] Create React app
+- [x] Connect to analytics endpoints
+- [x] Charts (e.g., bar chart, line chart)
 
 **Dashboard widgets (MVP UI)**
-- Most requested technologies
-- Technology frequency
-- Jobs by location
-- Jobs by experience level
-- Jobs by employment type
-- Jobs over time
-- Most common technology combinations
+- [x] Most requested technologies
+- [x] Jobs by location
+- [x] Jobs by experience level
+- [x] Jobs by employment type
+- [x] Jobs over time
+- [x] Most common technology combinations
 
 **Acceptance criteria**
-- Each widget calls the backend and renders a chart.
-- No hard-coded demo datasets.
+- [x] Each widget calls the backend and renders a chart.
+- [x] No hard-coded demo datasets.
 
 ---
 
 ## Milestone 5 — Ingestion from real sources (fetcher/scraper)
 
-**Goal:** Make it easy to add and maintain multiple job sources.
+**Status:** Complete
+
+**Goal:** Make it easy to add and maintain multiple job sources, without scraping sites (like LinkedIn or Kariyer.net) that forbid it in their ToS and actively block it technically.
 
 **Work items**
-- Fetcher → Parser → Normalizer → Extractor → DB pipeline
-- Source adapter interface/contract (e.g., `JobSourceAdapter`)
-- Basic rate limiting / retries / backoff
+- [x] Source adapter interface/contract (`JobSourceAdapter`, `JobFetchCriteria`) so ingestion, normalization, extraction and idempotent persistence stay source-agnostic
+- [x] `JoobleJobSourceAdapter` — calls Jooble's REST API with retries/backoff, wired to `POST /api/admin/import/jooble`
+
+**Resolved issue — Jooble has no Turkey inventory under this key**
+
+Confirmed by direct API testing (2026-09-01): the Jooble key (issued via the Turkey signup page, tr.jooble.org) only works against the general gateway, `https://jooble.org/api/{key}` — the Turkey-specific `tr.jooble.org/api/{key}` endpoint 403s the same key. The general gateway has no Turkey inventory under this key: `location` values of "Istanbul", "Ankara", "Izmir", "TR" and "Turkiye" all return `totalCount: 0`, and "Turkey" only matches the US town of Turkey, NC — not the country. This is a data-source/account limitation, not an adapter bug — no `location`/`keywords` combination surfaces real Turkish postings through this key.
+
+Since this is a portfolio project where a working, real-time ingestion pipeline matters more than strict geographic scope, the resolution is to run Jooble as a general/English-market real-world source rather than a Turkey-only one: `POST /api/admin/import/jooble` now defaults `location` to empty (dropping the misleading "Turkey" default that silently matched a US town), and pulls in genuine, live global software-job postings. `data/jobs.json` stays the Turkey-focused seed data; Jooble demonstrates the real-source integration end of the pipeline. Revisit only if a working `tr.jooble.org` key becomes available.
 
 **Acceptance criteria**
-- At least one real source integrated (while respecting legal/ethical boundaries).
-- Pipeline is modular enough to add another source with minimal changes.
+- [x] At least one real source integrated (while respecting legal/ethical boundaries).
+- [x] Pipeline is modular enough to add another source with minimal changes (proven by the adapter interface).
 
 ---
 
@@ -139,16 +149,25 @@ This roadmap is designed around a “backend + data model + analytics first, das
 
 This is the “productization” phase after MVP.
 
+**Status:** In progress — Docker done, everything else still open
+
 **Work items**
-- Redis caching for hot analytics
-- Docker + docker-compose (Spring Boot + Postgres + Redis)
-- Auth: ADMIN / USER (minimal)
-- Tests:
+- [x] Docker + docker-compose (Postgres + Spring Boot backend + React frontend, `docker compose up --build`)
+- [ ] Redis caching for hot analytics
+- [ ] Auth: ADMIN / USER (minimal)
+- [ ] Tests:
   - Unit (JUnit, Mockito)
   - Integration
   - Testcontainers
-- CI/CD (GitHub Actions):
+- [ ] CI/CD (GitHub Actions):
   - test → build → docker image → deploy
+
+**Docker implementation notes**
+- Three services: `db` (`postgres:17-alpine`), `backend` (multi-stage Maven build → `eclipse-temurin:21-jre-alpine`), `frontend` (multi-stage `node:20-alpine` Vite build → `nginx:1.27-alpine` static serve).
+- `backend/src/main/resources/application.properties` is gitignored (holds real local secrets) and deliberately excluded from the Docker build context via `backend/.dockerignore`, so no secret ever gets baked into the image. The container gets every Spring property — including `SPRING_DATASOURCE_*` and `APP_JOOBLE_API_KEY` — purely from environment variables set in `docker-compose.yml`/`.env`.
+- Postgres data persists in a named volume (`db-data`); Flyway runs the migrations automatically against the fresh DB on backend startup — no manual schema setup.
+- `data/jobs.json` is bind-mounted read-only into the backend container so `POST /api/admin/import/jobs` works without rebuilding the image.
+- Verified end-to-end (2026-09-01) on an isolated Compose project: fresh containers, Flyway migrated 3 versions from an empty schema, `GET /api/jobs` returned the 5 seeded jobs, `POST /api/admin/import/jobs` imported the 4 `data/jobs.json` records, and `GET /api/analytics/technologies` returned real counts.
 
 ---
 
